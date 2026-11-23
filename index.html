@@ -14,7 +14,7 @@ $('backup').onclick=()=>{let u=URL.createObjectURL(new Blob([JSON.stringify(data
 let route=[],map=null,line=null;function clearRoute(){route=[];if(line)line.setLatLngs([]);if(map){map.remove();map=null;line=null;$('map').hidden=true;}}function routePoint(c){route.push([c.latitude,c.longitude]);if(line){line.setLatLngs(route);map.setView(route.at(-1),15);}}$('mapEnable').onclick=()=>{if(map)return;if(!window.L){alert('Karte nicht verfügbar.');return}if(!confirm('Karte laden? Kartenausschnitte werden von OpenStreetMap abgerufen; dabei werden IP-Adresse und Kartenausschnitt übertragen.'))return;$('map').hidden=false;map=L.map('map').setView(route.at(-1)||[51,10],route.length?15:5);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);line=L.polyline(route,{color:'#087f80',weight:5}).addTo(map)};
 const sections=[...$('appContent').querySelectorAll(':scope > section')];const tracking=sections[1];const trackBox=document.createElement('div');trackBox.id='tracking';while(tracking.firstChild)trackBox.append(tracking.firstChild);$('tripForm').insertBefore(trackBox,$('distance'));for(const b of trackBox.querySelectorAll('button'))b.type='button';function page(p){const groups={home:[0],fleet:[2,5],trips:[3,4],account:[6,7]};sections.forEach((el,i)=>el.hidden=!(groups[p]||[]).includes(i));if(document.body.classList.contains('signed-in'))$('authPanel').hidden=p!=='account';else $('authPanel').hidden=false;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));if(p==='trips'){options();updateVehicleHint();}if(p==='trips'&&map)setTimeout(()=>map?.invalidateSize(),100);window.scrollTo(0,0)}document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>page(b.dataset.page));function updateVehicleHint() {const available=data.vehicles.some(v=>!v.inactive);$('vehicleHint').textContent=available?'':'Noch kein aktives Fahrzeug vorhanden. Bitte zuerst ein Fahrzeug anlegen.';$('addVehicleLink').hidden=available;} $('addVehicleLink').onclick=()=>page('fleet');const previousEdit=edit;edit=function(t){if(watch!==null){alert('Bitte zuerst die laufende Fahrt beenden.');return}page('trips');editing=t.id;options();previousEdit(t)};const gpsUseOld=$('gpsUse').onclick;$('gpsUse').onclick=()=>{page('trips');gpsUseOld()};$('theme').onclick=()=>{document.body.classList.toggle('light');};$('printReport').onclick=()=>{const ts=filtered();$('reportText').textContent='DriveLog PRO – '+today()+'\n'+ts.map(t=>[t.date,data.vehicles.find(v=>v.id===t.vehicle)?.name||'',t.origin+' → '+t.destination,(t.end-t.start)+' km',t.kind,t.purpose].join(' | ')).join('\n')+'\nGesamt: '+ts.reduce((a,t)=>a+t.end-t.start,0)+' km';window.print()};$('reportText').textContent='Bericht enthält Fahrten des aktuell gewählten Übersichtsfilters.';
 </script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.0"></script><script>
-(async()=>{const status=m=>$('cloudStatus').textContent=m;try{const client=window.supabase.createClient('https://hsfeuxfihumtjxsmvnii.supabase.co','sb_publishable_6M1InQwFfA4waM14oOvAeg_KcuDk80S',{auth:{experimental:{passkey:true}}});const redirect=location.origin+location.pathname;let user=null,busy=false,autoRunning=false,baseline=null,baselineReady=false,generation=0;window.driveLogAdminAccess={userId:()=>user?.id||null,summary:()=>client.rpc('drivelog_admin_summary')};const passkeyAvailable=()=>!!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext);
+(async()=>{const status=m=>$('cloudStatus').textContent=m;try{const client=window.supabase.createClient('https://hsfeuxfihumtjxsmvnii.supabase.co','sb_publishable_6M1InQwFfA4waM14oOvAeg_KcuDk80S',{auth:{experimental:{passkey:true}}});const redirect=location.origin+location.pathname;let user=null,busy=false,autoRunning=false,baseline=null,baselineReady=false,generation=0;window.driveLogAdminAccess={userId:()=>user?.id||null,summary:()=>client.rpc('drivelog_admin_summary'),customers:()=>client.rpc('drivelog_admin_customers')};const passkeyAvailable=()=>!!(window.PublicKeyCredential&&navigator.credentials&&window.isSecureContext);
 const passkeySignIn=document.createElement('button');passkeySignIn.type='button';passkeySignIn.id='passkeySignIn';passkeySignIn.className='alt';passkeySignIn.textContent='🔐 Mit Face ID / Passkey anmelden';passkeySignIn.hidden=true;$('login').after(passkeySignIn);
 const passkeySetup=document.createElement('div');passkeySetup.id='passkeySetup';passkeySetup.hidden=true;passkeySetup.innerHTML='<p id="passkeyPrompt">Möchtest du künftig Face ID / Passkey für die Anmeldung verwenden?</p><button id="passkeyRegister" type="button">🔐 Face ID / Passkey einrichten</button><button id="passkeyLater" type="button" class="alt">Später</button><p class="muted" id="passkeyState" role="status">Passkeys können über die Gerätesicherheit (z. B. Face ID oder Gerätecode) bestätigt werden.</p>';$('account').append(passkeySetup);
 const passkeyState=m=>$('passkeyState').textContent=m;
@@ -113,9 +113,11 @@ body.light #compactDashboard .recent small{color:#516477}
   // asynchronous visibility state unreliable as the sole More-menu gate.
   const adminView=document.createElement('section');
   adminView.id='compactAdmin';adminView.hidden=true;
-  adminView.innerHTML='<h2>Admin Control Center</h2><p id="compactAdminStatus" role="status"></p><div id="compactAdminMetrics" class="admin-grid"></div><button id="compactAdminRefresh" type="button">Aktualisieren</button><p class="muted">Beta: Umsatz ist eine Tarifhochrechnung, keine bestätigte Zahlung.</p>';
+  adminView.innerHTML='<h2>Admin Control Center</h2><p id="compactAdminStatus" role="status"></p><div id="compactAdminMetrics" class="admin-grid"></div><h3>Kundenverwaltung</h3><label for="adminCustomerSearch">Kunden suchen</label><input id="adminCustomerSearch" type="search" placeholder="E-Mail oder Tarif" autocomplete="off"><p class="muted" id="adminCustomerCount"></p><div id="adminCustomerList"></div><button id="compactAdminRefresh" type="button">Aktualisieren</button><p class="muted">Beta: Umsatz ist eine Tarifhochrechnung, keine bestätigte Zahlung. Kundenliste nur lesbar.</p>';
   $('appContent').append(adminView);
-  let adminCheckSerial=0, verifiedAdminId=null;
+  let adminCheckSerial=0, verifiedAdminId=null, customerRows=[];
+  const customerList=()=>{const root=$('adminCustomerList');root.replaceChildren();const q=$('adminCustomerSearch').value.trim().toLocaleLowerCase();const rows=customerRows.filter(r=>(String(r.email||'')+' '+String(r.plan||'')).toLocaleLowerCase().includes(q));$('adminCustomerCount').textContent=rows.length+' von '+customerRows.length+' Konten';for(const r of rows){const article=document.createElement('article');const strong=document.createElement('strong');strong.textContent=r.email||'Keine E-Mail';const details=document.createElement('p');details.className='muted';const date=r.created_at?new Date(r.created_at).toLocaleDateString('de-DE'):'–';details.textContent='Registriert: '+date+' · Tarif: '+String(r.plan||'FREE').toUpperCase()+' · Status: '+String(r.status||'–');article.append(strong,details);root.append(article)}if(!rows.length){const p=document.createElement('p');p.className='muted';p.textContent='Keine passenden Kunden gefunden.';root.append(p)}};
+  $('adminCustomerSearch').oninput=customerList;
   const adminAccess=()=>window.driveLogAdminAccess;
   async function checkCompactAdmin(open=false){
     const token=++adminCheckSerial;
@@ -126,7 +128,7 @@ body.light #compactDashboard .recent small{color:#516477}
       if(open){adminView.hidden=true;page('more');}
       return;
     }
-    if(open){adminView.hidden=false;$('compactAdminStatus').textContent='Berechtigung wird geprüft …';$('compactAdminMetrics').replaceChildren();}
+    if(open){adminView.hidden=false;$('compactAdminStatus').textContent='Berechtigung wird geprüft …';$('compactAdminMetrics').replaceChildren();customerRows=[];$('adminCustomerList').replaceChildren();$('adminCustomerCount').textContent='';}
     try{
       const {data:stats,error}=await access.summary();
       if(token!==adminCheckSerial||adminAccess()?.userId()!==userId)return;
@@ -142,10 +144,20 @@ body.light #compactDashboard .recent small{color:#516477}
           const v=document.createElement('strong');v.textContent=String(value);
           el.append(t,v);$('compactAdminMetrics').append(el);
         }
+        $('adminCustomerCount').textContent='Kundenliste wird geladen …';
+        try{
+          const accessNow=adminAccess();
+          if(typeof accessNow?.customers!=='function')throw Error('Kundenabfrage nicht verfügbar');
+          const result=await accessNow.customers();
+          if(token!==adminCheckSerial||adminAccess()?.userId()!==userId)return;
+          if(result.error)throw result.error;
+          if(!Array.isArray(result.data))throw Error('Ungültige Serverantwort');
+          customerRows=result.data;customerList();
+        }catch(e){if(token===adminCheckSerial){customerRows=[];$('adminCustomerList').replaceChildren();$('adminCustomerCount').textContent='Kundenliste noch nicht verfügbar. Bitte zuerst das SQL-Setup in Supabase ausführen. ('+(e.message||'Fehler')+')';}}
       }
     }catch(e){
       if(token!==adminCheckSerial)return;
-      verifiedAdminId=null;links.adminCompact.hidden=true;
+      verifiedAdminId=null;customerRows=[];$('adminCustomerList').replaceChildren();links.adminCompact.hidden=true;
       if(open){adminView.hidden=true;page('more');}
     }
   }
